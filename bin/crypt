@@ -1,0 +1,84 @@
+#!/usr/bin/env node
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
+const program = require("commander");
+const pkg = require("../package.json");
+
+const DEFAULT_CIPHER_ALGORITHM = "aes-256-cbc";
+const DEFAULT_KEY_ENV_NAME = "NODE_CRYPT";
+
+program
+    .version(pkg.version)
+    .option("--key <key>", "cipher key")
+    .option("--cipher <algorithm name>", `the name of the cipher algorithm to use (default: ${DEFAULT_CIPHER_ALGORITHM}, see \`crypt list-ciphers\`)`)
+    .option("--key-env <name>", `the name of the environment variable to extract key (default: ${DEFAULT_KEY_ENV_NAME})`);
+
+program
+    .command("encrypt")
+    .description("encrypt files")
+    .arguments("<infile> <outfile>")
+    .action((infile, outfile) => {
+        infile = resolve(infile); outfile = resolve(outfile);
+
+        console.log(`encrypting ${infile} -> ${outfile}`);
+        fs.createReadStream(infile)
+            .pipe(getCipher("encrypt"))
+            .pipe(fs.createWriteStream(outfile));
+    });
+
+program
+    .command("decrypt")
+    .description("decrypt files")
+    .arguments("<infile> <outfile>")
+    .action((infile, outfile) => {
+        infile = resolve(infile); outfile = resolve(outfile);
+
+        console.log(`decrypting ${infile} -> ${outfile}`);
+        fs.createReadStream(resolve(infile))
+            .pipe(getCipher("decrypt"))
+            .pipe(fs.createWriteStream(resolve(outfile)));
+    });
+
+program
+    .command("list-ciphers")
+    .description("list the available ciphers")
+    .action(() => {
+        log(crypto.getCiphers().join("\n"));
+    });
+
+process.on("uncaughtException", fail);
+program.parse(process.argv);
+
+function getCipher(type) {
+    return crypto["create" + (type === "encrypt" ? "C" : "Dec") + "ipher"](
+        program.algorithm || DEFAULT_CIPHER_ALGORITHM, getKey()
+    );
+}
+
+function getKey() {
+    let key = program.key || process.env[program.keyEnv || DEFAULT_KEY_ENV_NAME];
+
+    if(!key) {
+        throw new Error(`no key provided`);
+    }
+
+    return key;
+}
+
+function resolve(filepath) {
+    return path.resolve(process.cwd(), filepath);
+}
+
+function log() {
+    return console.log.apply(console, arguments);
+}
+
+function fail(message, code = 1) {
+    if(message instanceof Error) {
+        message = message.message;
+    }
+
+    log("[!] " + message);
+    process.exit(1);
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@teamwork/crypt",
+  "description": "encrypt and decrypt files from the command line",
+  "version": "0.1.0",
+  "bin": {
+    "crypt": "./bin/crypt"
+  },
+  "dependencies": {
+    "commander": "^2.9.0"
+  }
+}
